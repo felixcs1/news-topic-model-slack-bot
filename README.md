@@ -1,14 +1,20 @@
 
-# Stats release slack bot 
+# Topic Model slack bot
 ![](img/demo.png)
 
-Scrapes ONS, gov.uk and gov.scot websites for upcoming stats releases, combines the data and saves to dropbox, and notifies the #stats-releases slack channel with links to the data. 
+- Takes an bbc new article id, runs it through a trained topic model and writes out the automatically applied labels to slack.
 
-The lambda can be triggered in two ways first on a predefined schedule i.e every friday at 11am, and the second is by a slash command `/get-stats [from date yyyy-mm-dd] [to date yyyy-mm-dd]` in slack (e.g `/get-stats 2020-05-02 2020-05-08`)
+- Adapted from stats realeases bot: https://github.com/bbc/vjdata.stats.releases, 
+- Deployed onto the data solutions sandbox account
+- Triggered with `/get-topics [article id]`
 
-- Dropbox folder: https://www.dropbox.com/home/Visual%20Journalism/Data/2020/vjdata.stats.releases
-- Dropbox paper: https://paper.dropbox.com/folder/show/stats-releases-e.1gg8YzoPEhbTkrhvQwJ2zznOCbaNo77vaDA33pKs3cFY0bHbw4ec
 
+Main changes from stats releases:
+- removed dropbox api calls
+- Changed env variables in makefile and templates
+- Added to package sctipt to delete package tests to reduced package size
+
+Below this point the docs are from https://github.com/bbc/vjdata.stats.releases, things are a bit different in this repo but the general deployment is the same.
 
 ## 1. Setup
 
