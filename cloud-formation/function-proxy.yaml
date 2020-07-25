@@ -1,0 +1,207 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Lambda function
+Parameters:
+  APIName:
+    Type: String
+    Description: The name for your API
+  LambdaCodeBucketName:
+    Type: String
+    Description: S3 bucket in which custom lambda code is stored
+  LambdaResourceName:
+    Type: String
+    Description: name of the lambda function resource (not the .py file name or the def name)
+  LambdaRoleName:
+      Type: String
+      Description: name of the lambda IAM role
+  LambdaZipPackageName:
+    Type: String
+    Description: Zip file name in which custom lambda code is stored
+  Lambdahandler:
+    Type: String
+    Description: Python file name which is packed inside the zip file
+    Default: lambda_function
+  PythonVersion:
+    Type: String
+    Description: Python runtime version for the lambda
+    Default: 3.7
+  Schedule:
+    Type: String
+    Description: cron style schedule lambda e.g rate(1 hour)
+    Default: rate(1 day)
+  SlackAuthToken:
+    Type: String
+    Description: Token for accessing the Slack API
+  SlackVerToken:
+    Type: String
+    Description: Secret to sign events from slack to authenticate them
+  DropboxToken:
+    Type: String
+    Description: Token for accessing the Dropbox API
+  DropboxPaperFolderIDSchedule:
+    Type: String
+    Description: Folder ID of paper folder to store results from scheduled triggers
+  DropboxPaperFolderIDSlack:
+    Type: String
+    Description: Folder ID of paper folder to store results from slack slash command triggers
+Resources:
+  LambdaFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Ref LambdaRoleName
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action:
+            - sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service:
+              - lambda.amazonaws.com
+              - apigateway.amazonaws.com
+        Version: 2012-10-17
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSLambdaExecute
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AWSXrayWriteOnlyAccess
+      Path: /
+  LambdaFunction:
+      Type: "AWS::Lambda::Function"
+      Properties: 
+        FunctionName: !Ref LambdaResourceName
+        Handler: !Sub '${Lambdahandler}.lambda_handler'
+        Role: !GetAtt 
+            - LambdaFunctionRole
+            - Arn
+        Code: 
+          S3Bucket: !Ref LambdaCodeBucketName
+          S3Key: !Ref LambdaZipPackageName
+        Runtime: !Sub "python${PythonVersion}"
+        Environment:
+          Variables:
+            STATS_RELEASES_SLACK_AUTH_TOKEN: !Ref SlackAuthToken
+            STATS_RELEASES_SLACK_VER_TOKEN: !Ref SlackVerToken
+            STATS_RELEASES_DROPBOX_TOKEN: !Ref DropboxToken
+            STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SCHEDULE: !Ref DropboxPaperFolderIDSchedule
+            STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SLACK: !Ref DropboxPaperFolderIDSlack
+        Timeout: 60
+        MemorySize: 256
+        TracingConfig:
+          Mode: "Active"
+  CloudwatchSchedule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Regular cron schedule for the lambda 
+      ScheduleExpression: !Ref Schedule
+      State: "ENABLED"
+      Targets: 
+        - 
+          Arn: 
+            Fn::GetAtt: 
+              - "LambdaFunction"
+              - "Arn"
+          Id: "TargetFunctionV1"
+  PermissionForEventsToInvokeLambda: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: 
+        Ref: "LambdaFunction"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: 
+        Fn::GetAtt: 
+          - "CloudwatchSchedule"
+          - "Arn"
+  # Everything below defines the Api gateway additions to 
+  # allow the lambda to be invoked by a post request 
+
+  # Role to allow api to invoke the lambda
+  ExecRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Action:
+          - sts:AssumeRole
+          Effect: Allow
+          Principal:
+            Service:
+            - apigateway.amazonaws.com
+      Policies:
+      - PolicyDocument:
+          Id: ExecPolicy
+          Statement:
+          - Action:
+            - lambda:InvokeFunction
+            Effect: Allow
+            Resource:
+            - Fn::GetAtt:
+              - LambdaFunction
+              - Arn
+          Version: '2012-10-17'
+        PolicyName: exec-policy
+  # The API
+  LambdaSimpleProxyAPI:
+    Type: 'AWS::ApiGateway::RestApi'
+    Description: "A lambda proxy API"
+    Properties:
+      Name: !Ref APIName
+      Parameters:
+        endpointConfigurationTypes: REGIONAL
+  ProxyResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Description: "A lambda proxy API"
+    Properties:
+      RestApiId: !Ref LambdaSimpleProxyAPI
+      ParentId: !GetAtt 
+        - LambdaSimpleProxyAPI
+        - RootResourceId
+      PathPart: 'prod'
+  ApiLambdaMethodPOST:
+    Type: 'AWS::ApiGateway::Method'
+    Description: "A lambda proxy API"
+    DependsOn:
+      - LambdaFunction
+      - PermissionForEventsToInvokeLambda
+    Properties:
+      RestApiId: !Ref LambdaSimpleProxyAPI
+      ResourceId: !Ref ProxyResource
+      HttpMethod: POST
+      AuthorizationType: NONE
+      Integration:
+        Credentials: !GetAtt
+          - ExecRole
+          - Arn
+        Type: AWS_PROXY
+        IntegrationHttpMethod: POST
+        Uri: !Sub >-
+          arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaFunction.Arn}/invocations
+      MethodResponses:
+        - StatusCode: '200'
+  # Deploys the api to stage
+  Deployment:
+    Type: AWS::ApiGateway::Deployment
+    DependsOn: ApiLambdaMethodPOST
+    Properties:
+      RestApiId: !Ref LambdaSimpleProxyAPI
+  Stage:
+    Type: AWS::ApiGateway::Stage 
+    Properties:
+      DeploymentId: !Ref Deployment
+      RestApiId: !Ref LambdaSimpleProxyAPI
+      StageName: LATEST
+      MethodSettings:
+      - DataTraceEnabled: false
+        HttpMethod: "*"
+        LoggingLevel: INFO
+        ResourcePath: "/*"
+Outputs:
+  ApiEndpoint:
+    Description: Endpoint to trigger lambda
+    Value:
+      Fn::Join:
+      - ''
+      - - https://
+        - !Ref LambdaSimpleProxyAPI
+        - ".execute-api.eu-west-1.amazonaws.com/"
+        - LATEST/
+        - prod
+        

@@ -1,0 +1,121 @@
+{
+    "resource": "/prod",
+    "path": "/prod",
+    "httpMethod": "POST",
+    "headers": {
+        "Accept": "application/json,*/*",
+        "Accept-Encoding": "gzip,deflate",
+        "CloudFront-Forwarded-Proto": "https",
+        "CloudFront-Is-Desktop-Viewer": "true",
+        "CloudFront-Is-Mobile-Viewer": "false",
+        "CloudFront-Is-SmartTV-Viewer": "false",
+        "CloudFront-Is-Tablet-Viewer": "false",
+        "CloudFront-Viewer-Country": "US",
+        "Content-Type": "application/x-www-form-urlencoded",
+        "Host": "xdchbys5n9.execute-api.eu-west-1.amazonaws.com",
+        "User-Agent": "Slackbot 1.0 (+https://api.slack.com/robots)",
+        "Via": "1.1 7ba3a61255419c2e0d9e131796899e10.cloudfront.net (CloudFront)",
+        "X-Amz-Cf-Id": "YGrmde_5CFoXEcnlFe5ILVVDyMubgP7INZOD6otYZ8kBKE4JP_FCuQ==",
+        "X-Amzn-Trace-Id": "Root=1-5e344752-3d42b4c3d105de8c5a889f1f",
+        "X-Forwarded-For": "54.210.226.219, 130.176.98.148",
+        "X-Forwarded-Port": "443",
+        "X-Forwarded-Proto": "https",
+        "X-Slack-Request-Timestamp": "1580484434",
+        "X-Slack-Signature": "v0=6c8cd7df4724e0a45d7093965cae4c579ed9de67254bc59b10f6762ae9b6881b"
+    },
+    "multiValueHeaders": {
+        "Accept": [
+            "application/json,*/*"
+        ],
+        "Accept-Encoding": [
+            "gzip,deflate"
+        ],
+        "CloudFront-Forwarded-Proto": [
+            "https"
+        ],
+        "CloudFront-Is-Desktop-Viewer": [
+            "true"
+        ],
+        "CloudFront-Is-Mobile-Viewer": [
+            "false"
+        ],
+        "CloudFront-Is-SmartTV-Viewer": [
+            "false"
+        ],
+        "CloudFront-Is-Tablet-Viewer": [
+            "false"
+        ],
+        "CloudFront-Viewer-Country": [
+            "US"
+        ],
+        "Content-Type": [
+            "application/x-www-form-urlencoded"
+        ],
+        "Host": [
+            "xdchbys5n9.execute-api.eu-west-1.amazonaws.com"
+        ],
+        "User-Agent": [
+            "Slackbot 1.0 (+https://api.slack.com/robots)"
+        ],
+        "Via": [
+            "1.1 7ba3a61255419c2e0d9e131796899e10.cloudfront.net (CloudFront)"
+        ],
+        "X-Amz-Cf-Id": [
+            "YGrmde_5CFoXEcnlFe5ILVVDyMubgP7INZOD6otYZ8kBKE4JP_FCuQ=="
+        ],
+        "X-Amzn-Trace-Id": [
+            "Root=1-5e344752-3d42b4c3d105de8c5a889f1f"
+        ],
+        "X-Forwarded-For": [
+            "54.210.226.219, 130.176.98.148"
+        ],
+        "X-Forwarded-Port": [
+            "443"
+        ],
+        "X-Forwarded-Proto": [
+            "https"
+        ],
+        "X-Slack-Request-Timestamp": [
+            "1580484434"
+        ],
+        "X-Slack-Signature": [
+            "v0=6c8cd7df4724e0a45d7093965cae4c579ed9de67254bc59b10f6762ae9b6881b"
+        ]
+    },
+    "queryStringParameters": null,
+    "multiValueQueryStringParameters": null,
+    "pathParameters": null,
+    "stageVariables": null,
+    "requestContext": {
+        "resourceId": "7w0kj5",
+        "resourcePath": "/prod",
+        "httpMethod": "POST",
+        "extendedRequestId": "HLAU7GalDoEFvhQ=",
+        "requestTime": "31/Jan/2020:15:27:14 +0000",
+        "path": "/LATEST/prod",
+        "accountId": "972518559371",
+        "protocol": "HTTP/1.1",
+        "stage": "LATEST",
+        "domainPrefix": "xdchbys5n9",
+        "requestTimeEpoch": 1580484434626,
+        "requestId": "9050345f-1b6f-45c6-a754-9370cda165c7",
+        "identity": {
+            "cognitoIdentityPoolId": null,
+            "accountId": null,
+            "cognitoIdentityId": null,
+            "caller": null,
+            "sourceIp": "54.210.226.219",
+            "principalOrgId": null,
+            "accessKey": null,
+            "cognitoAuthenticationType": null,
+            "cognitoAuthenticationProvider": null,
+            "userArn": null,
+            "userAgent": "Slackbot 1.0 (+https://api.slack.com/robots)",
+            "user": null
+        },
+        "domainName": "xdchbys5n9.execute-api.eu-west-1.amazonaws.com",
+        "apiId": "xdchbys5n9"
+    },
+    "body": "token=y0IAxV6hmGGJM2LDAqGixCcn&team_id=T03N363D0&team_domain=bbcnews&channel_id=CT30PMF1P&channel_name=stats-releases-test&user_id=WCMBXT0CF&user_name=stephf02&command=%2Fget-stats&text=2020-02-20+2020-02-25&enterprise_id=E7FKN432R&enterprise_name=BBC&response_url=https%3A%2F%2Fhooks.slack.com%2Fcommands%2FT03N363D0%2F933051909959%2F79aOSSqBKlPsVJe2AFjrl38i&trigger_id=931189742400.3751207442.dfce73df040de40547a27800488d4997",
+    "isBase64Encoded": false
+}

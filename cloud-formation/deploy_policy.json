@@ -1,0 +1,45 @@
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "VisualEditor1",
+            "Effect": "Allow",
+            "Action": [
+                "cloudformation:DetectStackDrift",
+                "apigateway:*",
+                "s3:*",
+                "cloudformation:ListStackSetOperations",
+                "cloudformation:DescribeStackInstance",
+                "cloudformation:ListStackInstances",
+                "cloudformation:DescribeStackResources",
+                "cloudformation:DescribeStackResource",
+                "cloudformation:GetTemplateSummary",
+                "cloudformation:DescribeStacks",
+                "cloudformation:DetectStackResourceDrift",
+                "cloudformation:ListStackSetOperationResults",
+                "cloudformation:DescribeStackEvents",
+                "cloudformation:DescribeStackResourceDrifts",
+                "cloudformation:GetStackPolicy",
+                "cloudformation:DescribeStackSet",
+                "cloudformation:ListStackSets",
+                "cloudwatch:*",
+                "cloudformation:GetTemplate",
+                "cloudformation:DescribeStackSetOperation",
+                "lambda:*",
+                "cloudformation:DescribeChangeSet",
+                "cloudformation:ListChangeSets",
+                "cloudformation:ListStackResources",
+                "events:PutRule"
+            ],
+            "Resource": [
+                "arn:aws:lambda:eu-west-1:301790081969:function:vjdata-stats-releases-lambda-function",
+                "arn:aws:events:eu-west-1:301790081969:rule/vjdata-stats-releases-lambda-schedule",
+                "arn:aws:apigateway:us-east-1::/restapis/6p8yqznzrj/*",
+                "arn:aws:s3:::vjdata-stats-releases-lambda-code-bucket",
+                "arn:aws:s3:::vjdata-stats-releases-lambda-code-bucket/*",
+                "arn:aws:cloudformation:eu-west-1:301790081969:stack/vjdata-stats-releases-s3-stack/eaddd330-57b3-11ea-93f9-0ad4772b7a1e",
+                "arn:aws:cloudformation:eu-west-1:301790081969:stack/vjdata-stats-releases-lambda-stack/ab778240-57b3-11ea-80b1-021deeb5f1c0"
+            ]
+        }
+    ]
+}

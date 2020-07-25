@@ -1,0 +1,13 @@
+{
+    "version": "0",
+    "id": "e06a939f-4c1a-5bdd-48d6-9f570baa059e",
+    "detail-type": "Scheduled Event",
+    "source": "aws.events",
+    "account": "972518559371",
+    "time": "2020-01-13T13:51:51Z",
+    "region": "eu-west-1",
+    "resources": [
+        "arn:aws:events:eu-west-1:972518559371:rule/stats-releases-lambda-stack-CloudwatchSchedule-15JSNNLWWEDC"
+    ],
+    "detail": {}
+}

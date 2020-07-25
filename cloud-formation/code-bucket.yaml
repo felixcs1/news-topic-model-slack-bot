@@ -1,0 +1,11 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Bucket to hold lambda code bundle for this project.
+Parameters:
+  LambdaCodeBucketName:
+    Type: String
+    Description: S3 bucket in which custom lambda code is stored
+Resources:
+  LambdaCodeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Ref LambdaCodeBucketName
