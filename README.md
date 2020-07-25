@@ -1,7 +1,7 @@
 
 # Topic Model slack bot
 
-Takes a bbc new article id, runs it through a trained topic model and writes out the automatically applied labels to slack.
+Takes a bbc news article id, runs it through a trained topic model and writes out the automatically applied labels to slack.
 
 ![](img/demo.png)
 
