@@ -1,64 +1,59 @@
 import re
-import pandas as pd
 import unicodedata
 import emoji
 import json
 import datetime as dt
 import os
 import traceback
+import boto3
+import requests
+import zipfile
+import time
+import logging
 
-from persistence import *
+
+import config
 from post_to_slack import *
-from scraper import *
+from topic_labelling import assign_topic_labels
 
-DBX_PATH = "/Visual Journalism/Data/2020/vjdata.stats.releases/"
-DBX_RELEASES_TO_IGNORE = DBX_PATH + "ignore_releases/releases_to_ignore.csv"
+logger = logging.getLogger(__name__)
+logger.setLevel(config.log_level)
 
 ### CREDENTIALS FOR SLACK AND DROPBOX ######
-DBX_ACCCES_TOKEN = os.environ['STATS_RELEASES_DROPBOX_TOKEN']
-SLACK_AUTH_TOKEN = os.environ['STATS_RELEASES_SLACK_AUTH_TOKEN']
-SLACK_VER_TOKEN = os.environ['STATS_RELEASES_SLACK_VER_TOKEN']
-DBX_PAPER_FOLDER_ID_SCHEDULE = os.environ['STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SCHEDULE']
-DBX_PAPER_FOLDER_ID_SLACK = os.environ['STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SLACK']
-DBX_PAPER_BASE_URL = "https://paper.dropbox.com/doc/"
+SLACK_AUTH_TOKEN = os.environ['TOPIC_MODEL_SLACK_AUTH_TOKEN']
+CPS_API_KEY = os.environ['CPS_API_KEY']
 
-DEFAULT_SLACK_CHANNEL = "#stats-releases"
+DEFAULT_SLACK_CHANNEL = "#topic-model"
 
 # This is the entry point of the lambda 
 def lambda_handler(event, context):
+    download_models()
 
-    # Determine how the lambda was triggered raise error if unrecognised
+    slack = initialise_slack_client(SLACK_AUTH_TOKEN)
+
     trigger = get_event_source(event)
-    
+
+    # Set the channel to post output to
+    slack_channel = get_slack_channel_name(event, trigger)
     try:
-        # Intialise dropbox and slack clients
-        dbx = initialise_dropbox_client(DBX_ACCCES_TOKEN)
-        slack = initialise_slack_client(SLACK_AUTH_TOKEN)
-
-        # Set the channel to post output to
-        slack_channel = get_slack_channel_name(event, trigger)
-
-        # Establish the source of event and get date range 
-        validate_event_and_post_trigger_to_slack(event, slack, slack_channel, trigger)
+        event_body=parse_slack_event_body(event)
         
-        # Get date range
-        FROM_DATE, TO_DATE = get_valid_dates(event, slack, slack_channel, trigger)
-        
-        # Perform scraping
-        dropbox_file = read_from_dropbox(dbx, DBX_RELEASES_TO_IGNORE)
-        releases_to_ignore = pd.read_csv(dropbox_file.raw) # pylint: ignore
-        stats_releases, ignored_releases = scrape_releases(FROM_DATE, TO_DATE, releases_to_ignore, DBX_PATH, slack, slack_channel)
+        article_id = event_body['text']
+        title, article_content = get_article_content(article_id)
 
-        # Write to dropbox 
-        dbx_file_path = write_output_to_dropbox(stats_releases, ignored_releases, FROM_DATE, TO_DATE, dbx, trigger)
+        # Post title 
+        logger.debug(f"Writing to slack channel {slack_channel}")
+        post_message_to_slack(slack, slack_channel, f"Getting labels for article:\n*{title}*", emoji=':bbcnews:')
 
-        # Write to dropbox paper doc
-        paper_doc_url = write_output_to_dropbox_paper(stats_releases, FROM_DATE, TO_DATE, dbx, trigger)
+        # apply model
+        article_labels = assign_topic_labels(article_content)
+        print(article_labels)
 
-        # Post data info to slack
-        post_data_links_to_slack(FROM_DATE, TO_DATE, slack, slack_channel, dbx, dbx_file_path, paper_doc_url)
+        # Prepare lables for posting to slack 
+        labels_string = ', '.join([f"{topic['name']} ({round(topic['score'],2)})" for topic in article_labels])
+        topics_message = f"Labels: *{labels_string}*"
+        post_message_to_slack(slack, slack_channel, topics_message, emoji=emoji.emojize(':tick:'))
 
-        print("\nSCRAPING COMPLETE!")
         return { "statusCode": 200, "body": "Lambda completed sucessfully" }
     except Exception as e:
         # Whatever exception is raised throughout the app it is caught and reported here
@@ -67,6 +62,66 @@ def lambda_handler(event, context):
         traceback.print_exc()
         post_error_to_slack(slack, slack_channel, e)
         print("ERROR CAUGHT: ", e)
+
+
+
+def get_article_content(article_id):
+
+    query_string = f"http://content-api-a127.api.bbci.co.uk/cms/cps/asset/{article_id}?api_key={CPS_API_KEY}"
+
+    headers = {
+        "X-Candy-Platform": "desktop",
+        "x-candy-audience": "domestic",
+        "Accept": "application/json"
+    }
+    response = requests.get(query_string, headers=headers)
+
+    if response.status_code != 200:
+        raise Exception("Invalid id given, article could not be found")
+    
+    response_json = response.json()
+    
+    title = response_json["results"][0]["title"]
+    summary = response_json["results"][0]["summary"]
+    body_with_html = response_json["results"][0]["body"]
+
+    body_cleaned = re.sub('<[^<]+?>', '', body_with_html)
+
+    return title, f"{title} {summary} {body_cleaned}"
+
+
+def download_models():
+    """Download models to local cache from S3 if they're not already there."""
+    
+    print("pre download")
+    for item in os.walk('/tmp'):
+        print(item)
+
+    print("Download models" , config.download_models)
+    print("Download models" , os.path.exists(config.local_model_path), config.local_model_path)
+
+    if config.download_models and not os.path.exists(config.local_model_path):
+        logger.debug(
+            f'Fetching models from bucket: {config.model_bucket} '
+            f'and key: {config.model_zip_s3_key} '
+            f'to local path: {config.local_model_zip_path}'
+            )
+        os.mkdir(config.local_model_path)
+        s3_client = boto3.client('s3')
+        s3_client.download_file(
+            config.model_bucket, config.model_zip_s3_key,
+            config.local_model_zip_path
+            )
+        logger.debug(
+            f'Downloaded models to {config.local_model_zip_path}. Unzipping...'
+            )
+        with zipfile.ZipFile(config.local_model_zip_path, 'r') as zip_ref:
+            zip_ref.extractall(config.local_model_path)
+
+    print("after download")
+    for item in os.walk('/tmp'):
+        print(item)
+
 
 def get_event_source(event):
     '''
@@ -97,7 +152,7 @@ def get_slack_channel_name(event, trigger):
         if channel_name == 'privatemessage' or channel_name == 'directmessage' or channel_name == 'privategroup':
             return event_params['channel_id']
         else:
-            return f"#{channel_name}"
+            return channel_name
     elif trigger == "aws-trigger":
         return DEFAULT_SLACK_CHANNEL
 
@@ -113,10 +168,6 @@ def validate_event_and_post_trigger_to_slack(event, slack_client, slack_channel,
     # Establish where the trigger came from and set to and from dates accordingly
     if trigger == "slack-trigger":
         event_params = parse_slack_event_body(event)
-
-        # Certify the POST came from slack	  
-        if event_params['token'] != SLACK_VER_TOKEN:	
-            raise Exception("Lambda was triggered without correct slack token")
 
         if slack_channel == DEFAULT_SLACK_CHANNEL:
             trigger_message = f"Lambda Triggered from slack command by {event_params['user_name']} in this channel"
@@ -139,144 +190,7 @@ def parse_slack_event_body(event):
     body = event["slack-body"]
     return dict([k_v_pair.split("=") for k_v_pair in body.split("&")])
 
-def get_valid_dates(event, slack_client, slack_channel, trigger):
-    '''
-        Get to and from dates 
 
-        Either: Get default schedule dates
-        From date: sunday after next, To date: the staurday after from date
-        e.g if run on friday 10th Jan it will set: FROM: Sun 19th jan and TO: Sat 25th Jan 
-
-        Or: Get dates from slack event body when triggered with slash comamnd
-    '''
-
-    if trigger == 'aws-trigger':
-        now = dt.datetime.now()
-        from_date = now + dt.timedelta(days=(13 - now.weekday()))
-        to_date = from_date + dt.timedelta(days=6)
-        return from_date, to_date
-
-    elif trigger == 'slack-trigger':
-        
-        event_params = parse_slack_event_body(event)
-        dates = event_params['text'].split("+")
-
-        try:
-            try:
-                from_date = dt.datetime.strptime(dates[0], "%Y-%m-%d")
-                to_date = dt.datetime.strptime(dates[1], "%Y-%m-%d")
-            except:
-                raise Exception("Must be YYYY-MM-DD")
-
-            if (to_date < from_date):
-                raise Exception("The from date must be before the to date!")
-            if (to_date == from_date):
-                raise Exception("The from date can't be the same as the to date!")
-            if (from_date < dt.datetime.now()):
-                raise Exception("The from date must be after todays date!")
-            if (from_date > dt.datetime.now() + dt.timedelta(days=180) or (to_date > dt.datetime.now() + dt.timedelta(days=180))):
-                raise Exception("Dates must be within 6 months of the current date")
-        except Exception as e:
-            raise Exception(f"Dates given are of the wrong format: {e}")
-
-        return (from_date, to_date)
-    else:
-        return None
-
-
-def get_nice_dates(from_date, to_date):
-    '''
-        Get nice date format for print out and naming paper docs
-    '''
-    nice_from_date = dt.datetime.strftime(from_date, "%a %d %b")
-    nice_to_date = dt.datetime.strftime(to_date, "%a %d %b")
-    return nice_from_date, nice_to_date
-
-def write_output_to_dropbox(data, ignored_data, from_date, to_date, dbx, trigger):
-    '''
-        Takes data and writes to dropbox:
-        In the slack_trigger_realeases folder if lambda triggered from slack
-        In the scheduled_releases folder if lambda triggered on schedule
-
-        Returns file path data written to
-    '''
-
-    print("Writing data to dropbox...")
-
-    from_string = dt.datetime.strftime(from_date, "%Y-%m-%d")
-    to_string = dt.datetime.strftime(to_date, "%Y-%m-%d")
-
-    file_name = f"stats_releases_{from_string}_{to_string}.csv"
-
-    if trigger == "slack-trigger":
-        file_path = f"{DBX_PATH}slack_trigger_releases/{file_name}"
-    else:
-        file_path = f"{DBX_PATH}scheduled_releases/{file_name}"
-       
-    ignored_file_path = f"{DBX_PATH}ignored/ignored_{file_name}"
-
-    write_dataframe_to_dropbox(dbx, ignored_data, ignored_file_path)
-    write_dataframe_to_dropbox(dbx, data, file_path)
-    
-    return file_path
-
-def write_output_to_dropbox_paper(data, from_date, to_date, dbx, trigger):
-    '''
-        Convert dataframe to markdown and write to a paper doc, depnenging on the
-        trigger, write to either the slack or schedule folder. 
-    '''
-
-    print("Writing markdown table to dropbox paper...")
-
-    nice_from_date, nice_to_date = get_nice_dates(from_date, to_date)
-
-    # Nice formatting for output
-    data['date'] = data['date'].dt.strftime("**%a** %d %b")
-    # data['link'] = data['link'].apply(lambda link: f"[link]({link})")
-    
-    # First create a googlable link without dates in title 
-    data.insert(1, 'google', data['release'].apply(lambda release: f"[{release.split(':')[0]}](https://www.google.com/search?q={release.split(':')[0]})"))
-
-    # Then Hyper link the release title to the release page
-    data['release'] = data['release'].apply(lambda title: f"[{title}]({data[data['release'] == title]['link'].values[0]})")
-    data.drop(['link', 'day'], axis=1, inplace=True)
-
-    # Convert df to a markdown table to write to paper
-    dropbox_paper_title = f"Stats releases {nice_from_date} to {nice_to_date}"
-    mark_down_header = pd.DataFrame([['---'] * len(data.columns)], columns=data.columns)
-
-    stats_releases_md = pd.concat([mark_down_header, data])
-    mark_down_data = stats_releases_md.to_csv(sep="|", index=False)
-
-
-    if trigger == 'aws-trigger':
-        file_id = write_to_dropbox_paper(dbx, dropbox_paper_title, mark_down_data, 'markdown', DBX_PAPER_FOLDER_ID_SCHEDULE)
-    else:
-        file_id = write_to_dropbox_paper(dbx, dropbox_paper_title, mark_down_data, 'markdown', DBX_PAPER_FOLDER_ID_SLACK)
-        
-    doc_url = f"{DBX_PAPER_BASE_URL}{dropbox_paper_title.replace(' ','-')}-{file_id}"
-
-    return doc_url
-
-def post_data_links_to_slack(from_date, to_date, slack_client, slack_channel, dbx, dbx_path, dbx_paper_url):
-    '''
-        Produce the slack output once scraping is completed
-    '''
-
-    dbx_url, dbx_download_url = get_urls_for_file(dbx, dbx_path)
-
-    # Nice date strings to post to slack
-    nice_from_date, nice_to_date = get_nice_dates(from_date, to_date)
-
-    link_emoji = emoji.emojize(':link:')
-    file_emoji = emoji.emojize(':open_file_folder:')
-    message = f"Stats releases between *{nice_from_date}* and *{nice_to_date}*: \n"
-    message += f"{link_emoji} <{dbx_url}|Link to dropbox> {link_emoji}"
-    message += f"<{dbx_download_url}|Download csv> {link_emoji}"
-    message += f"<{dbx_paper_url}|Paper Doc>"
-    message += f"\n{file_emoji} `{dbx_path}` {file_emoji}"
-
-    post_message_to_slack(slack_client, slack_channel, message)
 
 # This is run when testing locally but not when deployed
 # It simply sets the event from an example json file
@@ -285,9 +199,13 @@ if __name__ == "__main__":
 
     import json
     import os
+    
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+
+    config.local_model_path = os.path.join(dir_path, "../models")
 
     base_dirname = os.path.realpath('')
-    event_path = os.path.join(base_dirname, 'events/event_schedule.json')
+    event_path = os.path.join(base_dirname, 'events/event_slack_body.json')
 
     with open(event_path) as json_file:
         event = json.load(json_file)

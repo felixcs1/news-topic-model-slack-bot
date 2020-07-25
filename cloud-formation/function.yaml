@@ -34,18 +34,10 @@ Parameters:
   SlackAuthToken:
     Type: String
     Description: Token for accessing the Slack API
-  SlackVerToken:
+  CpsApiKey:
     Type: String
-    Description: Secret to sign events from slack to authenticate them
-  DropboxToken:
-    Type: String
-    Description: Token for accessing the Dropbox API
-  DropboxPaperFolderIDSchedule:
-    Type: String
-    Description: Folder ID of paper folder to store results from scheduled triggers
-  DropboxPaperFolderIDSlack:
-    Type: String
-    Description: Folder ID of paper folder to store results from slack slash command triggers
+    Description: API for getting article text from the CPS API
+
 Resources:
   LambdaFunctionRole:
     Type: AWS::IAM::Role
@@ -80,11 +72,8 @@ Resources:
         Runtime: !Sub "python${PythonVersion}"
         Environment:
           Variables:
-            STATS_RELEASES_SLACK_AUTH_TOKEN: !Ref SlackAuthToken
-            STATS_RELEASES_SLACK_VER_TOKEN: !Ref SlackVerToken
-            STATS_RELEASES_DROPBOX_TOKEN: !Ref DropboxToken
-            STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SCHEDULE: !Ref DropboxPaperFolderIDSchedule
-            STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SLACK: !Ref DropboxPaperFolderIDSlack
+            CPS_API_KEY: !Ref CpsApiKey
+            TOPIC_MODEL_SLACK_AUTH_TOKEN: !Ref SlackAuthToken
         Timeout: 60
         MemorySize: 256
         TracingConfig:

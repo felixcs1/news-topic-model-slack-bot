@@ -1,12 +1,12 @@
 # The name attached to each aws resource
-PROJECT_NAME = vjdata-stats-releases
+PROJECT_NAME = topic-model-slack-bot
 
 # cron schedule for lambda
-SCHEDULE = "cron(0 9 ? * FRI *)"
-PYTHON_VERSION = 3.7
+SCHEDULE = "cron(0 9 ? * FRI 2050)"
+PYTHON_VERSION = 3.8
 
-ACCOUNT_ID = 301790081969
-AWS_PROFILE = wormhole
+# ACCOUNT_ID = 301790081969
+AWS_PROFILE = data-sol-sandbox
 
 # Config built from above values
 VENV_NAME = venv# python virtual environment to hold dependencies for local development
@@ -21,8 +21,8 @@ API_NAME = ${PROJECT_NAME}-lambda-api
 SCHEDULE_NAME = ${PROJECT_NAME}-lambda-schedule
 
 ##################### Assumes a certificate.pem file in ~/
-wormhole:
-	python3 scripts/wormhole.py -a ${ACCOUNT_ID} -p ${AWS_PROFILE}
+# wormhole:
+# 	python3 scripts/wormhole.py -a ${ACCOUNT_ID} -p ${AWS_PROFILE}
 
 
 ################# Setup - create venv and install requirements.txt ###########################
@@ -47,7 +47,7 @@ package:
 	docker run --rm -v $(shell pwd):/app lambci/lambda:build-python${PYTHON_VERSION} \
 		bash /app/scripts/package.sh ${DEPLOY_ZIP}
 
-deploy: wormhole
+deploy:
 	aws s3 cp ${DEPLOY_ZIP} s3://${S3_BUCKET} --profile ${AWS_PROFILE}
 	aws lambda update-function-code \
 		--function-name ${LAMBDA_NAME} \
@@ -57,7 +57,7 @@ deploy: wormhole
 		--profile ${AWS_PROFILE}
 
 # update the cron schedule with the SCHEDULE specified at the top of the file
-update_schedule: wormhole
+update_schedule:
 	echo ${SCHEDULE_NAME}
 	aws events put-rule \
 		--name ${SCHEDULE_NAME} \
@@ -74,7 +74,7 @@ create_stacks: create_s3 create_lambda
 clean_stacks: delete_s3 delete_lambda
 
 # creates bucket and adds a dummy deploy zip fot lambda to look for
-create_s3: wormhole
+create_s3:
 	aws cloudformation create-stack \
 		--stack-name ${S3_STACK_NAME} \
 		--template-body file://cloud-formation/code-bucket.yaml \
@@ -87,11 +87,11 @@ create_s3: wormhole
 	aws s3 cp ${DEPLOY_ZIP} s3://${S3_BUCKET} --profile ${AWS_PROFILE};\
 	rm ${DEPLOY_ZIP}; \
 
-delete_s3: wormhole
+delete_s3:
 	aws s3 rb s3://${S3_BUCKET} --force --profile ${AWS_PROFILE}
 	aws cloudformation delete-stack --stack-name ${S3_STACK_NAME} --profile ${AWS_PROFILE}
 
-create_lambda: wormhole delete_lambda
+create_lambda: delete_lambda
 	sleep 5
 	aws cloudformation create-stack \
 		--stack-name ${LAMBDA_STACK_NAME} \
@@ -108,24 +108,20 @@ create_lambda: wormhole delete_lambda
 			ParameterKey=LambdaCodeBucketName,ParameterValue=${S3_BUCKET} \
 			ParameterKey=LambdaRoleName,ParameterValue=${LAMBDA_ROLE_NAME} \
 			ParameterKey=PythonVersion,ParameterValue=${PYTHON_VERSION} \
-			ParameterKey=SlackAuthToken,ParameterValue=${STATS_RELEASES_SLACK_AUTH_TOKEN} \
-			ParameterKey=SlackVerToken,ParameterValue=${STATS_RELEASES_SLACK_VER_TOKEN} \
-			ParameterKey=DropboxToken,ParameterValue=${STATS_RELEASES_DROPBOX_TOKEN} \
-			ParameterKey=DropboxPaperFolderIDSchedule,ParameterValue=${STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SCHEDULE} \
-			ParameterKey=DropboxPaperFolderIDSlack,ParameterValue=${STATS_RELEASES_DROPBOX_PAPER_FOLDER_ID_SLACK} \
+			ParameterKey=CpsApiKey,ParameterValue=${CPS_API_KEY} \
+			ParameterKey=SlackAuthToken,ParameterValue=${TOPIC_MODEL_SLACK_AUTH_TOKEN} 
 
-
-delete_lambda: wormhole
+delete_lambda:
 	aws cloudformation delete-stack --stack-name ${LAMBDA_STACK_NAME} --profile ${AWS_PROFILE}
 	
 ### Handy commands
 
 # This returns the api endpoint to paste into your slack app slach command
-get_api_endpoint: wormhole
+get_api_endpoint:
 	aws cloudformation describe-stacks --stack-name ${LAMBDA_STACK_NAME} \
 		--query "Stacks[0].Outputs[0].OutputValue" \
 		--output text \
 		--profile ${AWS_PROFILE}
 
-list_live_stacks: wormhole
+list_live_stacks:
 	aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE  --profile ${AWS_PROFILE}

@@ -1,6 +1,7 @@
 venv
-dist
+dist/
 .DS_Store
 *.zip
 __pycache__
 .vscode/
+topic-model-slack-bot_deployment_bundle
