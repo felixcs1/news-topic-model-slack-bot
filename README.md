@@ -1,8 +1,9 @@
 
 # Topic Model slack bot
-![](img/demo.png)
 
-- Takes an bbc new article id, runs it through a trained topic model and writes out the automatically applied labels to slack.
+Takes a bbc new article id, runs it through a trained topic model and writes out the automatically applied labels to slack.
+
+![](img/demo.png)
 
 - Adapted from stats realeases bot: https://github.com/bbc/vjdata.stats.releases, 
 - Deployed onto the data solutions sandbox account
@@ -10,9 +11,9 @@
 
 
 Main changes from stats releases:
-- removed dropbox api calls
-- Changed env variables in makefile and templates
-- Added to package sctipt to delete package tests to reduced package size
+- Removed all functionality and replace wth topic modeling code
+- Changed env variables in makefile and templates, incliding api key to get article text
+- Added to package script to delete package tests to reduced package size
 
 Below this point the docs are from https://github.com/bbc/vjdata.stats.releases, things are a bit different in this repo but the general deployment is the same.
 
