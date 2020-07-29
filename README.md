@@ -27,17 +27,7 @@ You need to:
 
 - Install [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
 
-- Create a `certificate.pem` from your developer P12. Ensure it is saved your home directory:
-
-```
-openssl pkcs12 -in certificate.p12 -out certificate.pem -clcerts -nodes
-```
-
-- Ensure you can run `make wormhole`. This writes temporary aws credentials to your `.aws/credentials` file.
-
 - Run `make clean_setup` this creates a virtual env and installs dependencies into it order to be able to run the scraper locally.
-
-- Get an aws admin to attach the policy called `deploy-vjdata-stats-releases-lambda` to your wormhole role. This gives you permissions to deploy code to the lambda and update its schedule. 
 
 - Set env variables (required for running locally). These are the slack and dropbox api keys as well as the dropbox paper folder ids. Add these lines to your `~/.bash_profile`. See [this section](#how-you-can-get-the-required-auth-tokens) for more detail on getting these.
 ```
